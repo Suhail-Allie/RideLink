@@ -3,12 +3,19 @@ import 'package:flutter/material.dart';
 import '../data/app_data.dart';
 import '../widgets/dashboard_stat_card.dart';
 import '../widgets/summary_row.dart';
+import 'admin_driver_management_screen.dart';
 import 'admin_pricing_screen.dart';
 import 'welcome_screen.dart';
 
+/// AdminDashboardScreen
+///
+/// This screen is used by the taxi business owner/admin.
+/// It shows a business overview of all bookings, trip statuses,
+/// estimated revenue, pricing settings, driver management, and demo data tools.
 class AdminDashboardScreen extends StatelessWidget {
   const AdminDashboardScreen({super.key});
 
+  /// Logs the admin out and returns to the welcome screen.
   void _logout(BuildContext context) {
     Navigator.pushAndRemoveUntil(
       context,
@@ -17,26 +24,32 @@ class AdminDashboardScreen extends StatelessWidget {
     );
   }
 
+  /// Returns a colour based on the current booking status.
+  /// This helps make booking statuses easier to understand visually.
   Color _statusColor(String status) {
     if (status == 'Trip Completed') {
-      return const Color(0xFF16A34A);
+      return const Color(0xFF16A34A); // Green
     }
 
     if (status == 'Trip Started') {
-      return const Color(0xFF2563EB);
+      return const Color(0xFF2563EB); // Blue
     }
 
     if (status == 'Accepted by Driver') {
-      return const Color(0xFF7C3AED);
+      return const Color(0xFF7C3AED); // Purple
     }
 
     if (status == 'Cancelled by Driver') {
-      return const Color(0xFFDC2626);
+      return const Color(0xFFDC2626); // Red
     }
 
-    return const Color(0xFFF59E0B);
+    return const Color(0xFFF59E0B); // Orange for pending/default
   }
 
+  /// Clears all saved demo bookings after asking the admin to confirm.
+  ///
+  /// This is useful during testing because the app stores bookings locally.
+  /// It does not clear pricing settings or driver profiles.
   Future<void> _clearDemoData(BuildContext context) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -74,6 +87,7 @@ class AdminDashboardScreen extends StatelessWidget {
           ),
         );
 
+        // Refresh the admin dashboard after clearing saved bookings.
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -86,8 +100,10 @@ class AdminDashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Get all locally saved bookings from AppData.
     final bookings = AppData.bookings;
 
+    // Business statistics shown on the admin dashboard.
     final totalBookings = bookings.length;
 
     final completedTrips = bookings
@@ -106,6 +122,7 @@ class AdminDashboardScreen extends StatelessWidget {
         )
         .length;
 
+    // Estimated revenue excludes cancelled trips.
     final estimatedRevenue = bookings
         .where((booking) => booking.status != 'Cancelled by Driver')
         .fold<double>(
@@ -122,6 +139,7 @@ class AdminDashboardScreen extends StatelessWidget {
             children: [
               const SizedBox(height: 10),
 
+              // Header row with admin name and logout button.
               Row(
                 children: [
                   Expanded(
@@ -154,6 +172,7 @@ class AdminDashboardScreen extends StatelessWidget {
 
               const SizedBox(height: 24),
 
+              // Main owner dashboard summary card.
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
@@ -193,6 +212,8 @@ class AdminDashboardScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
+
+                    // Revenue summary.
                     Text(
                       'Estimated revenue: R${estimatedRevenue.toStringAsFixed(2)}',
                       style: const TextStyle(
@@ -201,9 +222,24 @@ class AdminDashboardScreen extends StatelessWidget {
                         height: 1.4,
                       ),
                     ),
+
                     const SizedBox(height: 8),
+
+                    // Current pricing summary.
                     Text(
                       'Current pricing: R${AppData.baseFare.toStringAsFixed(2)} base + R${AppData.pricePerKm.toStringAsFixed(2)} per km',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13.5,
+                        height: 1.4,
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    // Driver count summary.
+                    Text(
+                      'Registered drivers: ${AppData.drivers.length}',
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 13.5,
@@ -216,6 +252,7 @@ class AdminDashboardScreen extends StatelessWidget {
 
               const SizedBox(height: 24),
 
+              // First row of dashboard statistics.
               Row(
                 children: [
                   Expanded(
@@ -238,6 +275,7 @@ class AdminDashboardScreen extends StatelessWidget {
 
               const SizedBox(height: 14),
 
+              // Second row of dashboard statistics.
               Row(
                 children: [
                   Expanded(
@@ -260,6 +298,39 @@ class AdminDashboardScreen extends StatelessWidget {
 
               const SizedBox(height: 24),
 
+              // Opens the admin driver management screen.
+              SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AdminDriverManagementScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.groups_rounded),
+                  label: const Text(
+                    'Driver Management',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF1E3A8A),
+                    side: const BorderSide(color: Color(0xFF1E3A8A)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // Opens the pricing settings screen.
               SizedBox(
                 width: double.infinity,
                 height: 54,
@@ -291,6 +362,7 @@ class AdminDashboardScreen extends StatelessWidget {
 
               const SizedBox(height: 12),
 
+              // Clears all saved booking/demo data.
               SizedBox(
                 width: double.infinity,
                 height: 54,
@@ -326,6 +398,7 @@ class AdminDashboardScreen extends StatelessWidget {
 
               const SizedBox(height: 12),
 
+              // Empty state when no bookings exist.
               if (bookings.isEmpty)
                 Container(
                   width: double.infinity,
@@ -346,6 +419,7 @@ class AdminDashboardScreen extends StatelessWidget {
                   ),
                 )
               else
+                // List of all bookings submitted by customers.
                 ListView.builder(
                   itemCount: bookings.length,
                   shrinkWrap: true,
@@ -364,6 +438,7 @@ class AdminDashboardScreen extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Booking route title.
                           Row(
                             children: [
                               const Icon(
@@ -386,6 +461,7 @@ class AdminDashboardScreen extends StatelessWidget {
 
                           const SizedBox(height: 12),
 
+                          // Status badge.
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
@@ -408,6 +484,7 @@ class AdminDashboardScreen extends StatelessWidget {
 
                           const SizedBox(height: 16),
 
+                          // Booking details.
                           SummaryRow(
                             title: 'Customer',
                             value: booking.customerName,

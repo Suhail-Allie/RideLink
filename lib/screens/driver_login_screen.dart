@@ -28,7 +28,23 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
       return;
     }
 
-    AppData.currentDriverName = driverName;
+    final driver = AppData.findDriverByNameAndPassword(
+      name: driverName,
+      password: password,
+    );
+
+    if (driver == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Driver not found. Ask the admin to add this driver first.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    AppData.currentDriverName = driver.name;
 
     Navigator.pushAndRemoveUntil(
       context,
@@ -46,6 +62,8 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final hasDrivers = AppData.drivers.isNotEmpty;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Driver Login'),
@@ -96,7 +114,29 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
                 ),
               ),
 
-              const SizedBox(height: 28),
+              const SizedBox(height: 20),
+
+              if (!hasDrivers)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFF59E0B)),
+                  ),
+                  child: const Text(
+                    'No drivers have been added yet. Please log in as admin and add a driver first.',
+                    style: TextStyle(
+                      color: Color(0xFF92400E),
+                      fontSize: 14,
+                      height: 1.4,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+
+              if (!hasDrivers) const SizedBox(height: 20),
 
               InputField(
                 controller: driverNameController,
@@ -138,7 +178,7 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
               const SizedBox(height: 18),
 
               const Text(
-                'This is an MVP driver login. Real driver authentication will be added later.',
+                'Driver accounts are currently managed by the admin. This is still MVP authentication and will be upgraded later.',
                 style: TextStyle(
                   color: Color(0xFF9CA3AF),
                   fontSize: 13.5,
