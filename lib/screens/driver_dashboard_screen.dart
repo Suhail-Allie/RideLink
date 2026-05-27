@@ -5,6 +5,11 @@ import '../models/ride_booking.dart';
 import '../widgets/summary_row.dart';
 import 'welcome_screen.dart';
 
+/// DriverDashboardScreen
+///
+/// This screen is used by logged-in drivers.
+/// Drivers can view unassigned bookings and bookings assigned to them.
+/// They can accept, start, complete, or cancel trips.
 class DriverDashboardScreen extends StatefulWidget {
   const DriverDashboardScreen({super.key});
 
@@ -13,6 +18,7 @@ class DriverDashboardScreen extends StatefulWidget {
 }
 
 class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
+  /// Logs the driver out and returns to the welcome screen.
   void _logout() {
     Navigator.pushAndRemoveUntil(
       context,
@@ -21,6 +27,7 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
     );
   }
 
+  /// Driver accepts the ride.
   Future<void> _acceptRide(RideBooking booking) async {
     setState(() {
       booking.status = 'Accepted by Driver';
@@ -32,6 +39,7 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
     _showMessage('Ride accepted.');
   }
 
+  /// Driver starts the trip.
   Future<void> _startRide(RideBooking booking) async {
     setState(() {
       booking.status = 'Trip Started';
@@ -43,6 +51,7 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
     _showMessage('Trip started.');
   }
 
+  /// Driver completes the trip.
   Future<void> _completeRide(RideBooking booking) async {
     setState(() {
       booking.status = 'Trip Completed';
@@ -54,6 +63,7 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
     _showMessage('Trip completed.');
   }
 
+  /// Driver cancels the trip.
   Future<void> _cancelRide(RideBooking booking) async {
     setState(() {
       booking.status = 'Cancelled by Driver';
@@ -65,12 +75,14 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
     _showMessage('Trip cancelled.');
   }
 
+  /// Shows a short message at the bottom of the screen.
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
   }
 
+  /// Returns a colour based on booking status.
   Color _statusColor(String status) {
     if (status == 'Trip Completed') {
       return const Color(0xFF16A34A);
@@ -84,6 +96,10 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
       return const Color(0xFF7C3AED);
     }
 
+    if (status == 'Assigned to Driver') {
+      return const Color(0xFF0F766E);
+    }
+
     if (status == 'Cancelled by Driver') {
       return const Color(0xFFDC2626);
     }
@@ -91,10 +107,26 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
     return const Color(0xFFF59E0B);
   }
 
+  /// Controls which bookings a driver is allowed to see.
+  ///
+  /// A driver can see:
+  /// - bookings that are not assigned yet
+  /// - bookings assigned to the current driver
+  List<RideBooking> _visibleBookingsForDriver() {
+    return AppData.bookings.where((booking) {
+      final isUnassigned = booking.assignedDriver == 'Not assigned yet';
+      final isAssignedToCurrentDriver =
+          booking.assignedDriver == AppData.currentDriverName;
+
+      return isUnassigned || isAssignedToCurrentDriver;
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final bookings = AppData.bookings;
-    final pendingBookings =
+    final bookings = _visibleBookingsForDriver();
+
+    final activeBookings =
         bookings.where((booking) => booking.status != 'Trip Completed').length;
 
     return Scaffold(
@@ -129,7 +161,7 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
               const SizedBox(height: 8),
 
               const Text(
-                'View customer ride requests and update trip progress.',
+                'View assigned ride requests and update trip progress.',
                 style: TextStyle(
                   color: Color(0xFF6B7280),
                   fontSize: 15,
@@ -178,7 +210,7 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${bookings.length} total booking(s) • $pendingBookings active',
+                      '${bookings.length} visible booking(s) • $activeBookings active',
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 15,
@@ -201,7 +233,7 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
                     border: Border.all(color: const Color(0xFFE5E7EB)),
                   ),
                   child: const Text(
-                    'No customer bookings yet. Once a customer submits a ride request, it will appear here.',
+                    'No bookings are available for this driver yet. Assigned or unassigned bookings will appear here.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Color(0xFF6B7280),
@@ -354,6 +386,7 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
   }
 }
 
+/// Reusable button used for driver trip actions.
 class _DriverActionButton extends StatelessWidget {
   final String text;
   final IconData icon;
