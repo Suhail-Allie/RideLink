@@ -27,8 +27,23 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
     );
   }
 
+  /// Checks if this booking can still be updated by the driver.
+  ///
+  /// Drivers should not be able to update trips that are already completed
+  /// or cancelled by either the driver or the customer.
+  bool _canUpdateTrip(RideBooking booking) {
+    return booking.status != 'Trip Completed' &&
+        booking.status != 'Cancelled by Driver' &&
+        booking.status != 'Cancelled by Customer';
+  }
+
   /// Driver accepts the ride.
   Future<void> _acceptRide(RideBooking booking) async {
+    if (!_canUpdateTrip(booking)) {
+      _showMessage('This booking can no longer be updated.');
+      return;
+    }
+
     setState(() {
       booking.status = 'Accepted by Driver';
       booking.assignedDriver = AppData.currentDriverName;
@@ -41,6 +56,11 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
 
   /// Driver starts the trip.
   Future<void> _startRide(RideBooking booking) async {
+    if (!_canUpdateTrip(booking)) {
+      _showMessage('This booking can no longer be updated.');
+      return;
+    }
+
     setState(() {
       booking.status = 'Trip Started';
       booking.assignedDriver = AppData.currentDriverName;
@@ -53,6 +73,11 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
 
   /// Driver completes the trip.
   Future<void> _completeRide(RideBooking booking) async {
+    if (!_canUpdateTrip(booking)) {
+      _showMessage('This booking can no longer be updated.');
+      return;
+    }
+
     setState(() {
       booking.status = 'Trip Completed';
       booking.assignedDriver = AppData.currentDriverName;
@@ -65,6 +90,11 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
 
   /// Driver cancels the trip.
   Future<void> _cancelRide(RideBooking booking) async {
+    if (!_canUpdateTrip(booking)) {
+      _showMessage('This booking can no longer be updated.');
+      return;
+    }
+
     setState(() {
       booking.status = 'Cancelled by Driver';
       booking.assignedDriver = AppData.currentDriverName;
@@ -100,7 +130,7 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
       return const Color(0xFF0F766E);
     }
 
-    if (status == 'Cancelled by Driver') {
+    if (status == 'Cancelled by Driver' || status == 'Cancelled by Customer') {
       return const Color(0xFFDC2626);
     }
 
@@ -126,8 +156,15 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
   Widget build(BuildContext context) {
     final bookings = _visibleBookingsForDriver();
 
-    final activeBookings =
-        bookings.where((booking) => booking.status != 'Trip Completed').length;
+    // Active bookings exclude completed and cancelled bookings.
+    final activeBookings = bookings
+        .where(
+          (booking) =>
+              booking.status != 'Trip Completed' &&
+              booking.status != 'Cancelled by Driver' &&
+              booking.status != 'Cancelled by Customer',
+        )
+        .length;
 
     return Scaffold(
       body: SafeArea(
@@ -138,6 +175,7 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
             children: [
               const SizedBox(height: 10),
 
+              // Header with driver name and logout button.
               Row(
                 children: [
                   Expanded(
@@ -170,6 +208,7 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
 
               const SizedBox(height: 24),
 
+              // Driver dashboard summary card.
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
@@ -250,6 +289,8 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
                   itemBuilder: (context, index) {
                     final booking = bookings[index];
 
+                    final canUpdateTrip = _canUpdateTrip(booking);
+
                     return Container(
                       margin: const EdgeInsets.only(bottom: 16),
                       padding: const EdgeInsets.all(18),
@@ -261,6 +302,7 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Booking route title.
                           Row(
                             children: [
                               const Icon(
@@ -283,6 +325,7 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
 
                           const SizedBox(height: 12),
 
+                          // Booking status badge.
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
@@ -305,6 +348,7 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
 
                           const SizedBox(height: 16),
 
+                          // Booking details.
                           SummaryRow(
                             title: 'Customer',
                             value: booking.customerName,
@@ -338,41 +382,65 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
 
                           const SizedBox(height: 12),
 
-                          Wrap(
-                            spacing: 10,
-                            runSpacing: 10,
-                            children: [
-                              _DriverActionButton(
-                                text: 'Accept',
-                                icon: Icons.check_rounded,
-                                onPressed: () {
-                                  _acceptRide(booking);
-                                },
+                          // Driver action buttons are only shown for bookings
+                          // that are not completed or cancelled.
+                          if (canUpdateTrip)
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              children: [
+                                _DriverActionButton(
+                                  text: 'Accept',
+                                  icon: Icons.check_rounded,
+                                  onPressed: () {
+                                    _acceptRide(booking);
+                                  },
+                                ),
+                                _DriverActionButton(
+                                  text: 'Start',
+                                  icon: Icons.play_arrow_rounded,
+                                  onPressed: () {
+                                    _startRide(booking);
+                                  },
+                                ),
+                                _DriverActionButton(
+                                  text: 'Complete',
+                                  icon: Icons.flag_rounded,
+                                  onPressed: () {
+                                    _completeRide(booking);
+                                  },
+                                ),
+                                _DriverActionButton(
+                                  text: 'Cancel',
+                                  icon: Icons.close_rounded,
+                                  isDanger: true,
+                                  onPressed: () {
+                                    _cancelRide(booking);
+                                  },
+                                ),
+                              ],
+                            )
+                          else
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF9FAFB),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: const Color(0xFFE5E7EB),
+                                ),
                               ),
-                              _DriverActionButton(
-                                text: 'Start',
-                                icon: Icons.play_arrow_rounded,
-                                onPressed: () {
-                                  _startRide(booking);
-                                },
+                              child: const Text(
+                                'No driver action is available for this booking.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Color(0xFF6B7280),
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
-                              _DriverActionButton(
-                                text: 'Complete',
-                                icon: Icons.flag_rounded,
-                                onPressed: () {
-                                  _completeRide(booking);
-                                },
-                              ),
-                              _DriverActionButton(
-                                text: 'Cancel',
-                                icon: Icons.close_rounded,
-                                isDanger: true,
-                                onPressed: () {
-                                  _cancelRide(booking);
-                                },
-                              ),
-                            ],
-                          ),
+                            ),
                         ],
                       ),
                     );

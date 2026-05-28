@@ -43,9 +43,9 @@ class AdminDashboardScreen extends StatelessWidget {
       return const Color(0xFF0F766E);
     }
 
-    if (status == 'Cancelled by Driver') {
-      return const Color(0xFFDC2626);
-    }
+    if (status == 'Cancelled by Driver' || status == 'Cancelled by Customer') {
+  return const Color(0xFFDC2626);
+}
 
     return const Color(0xFFF59E0B);
   }
@@ -199,8 +199,12 @@ class AdminDashboardScreen extends StatelessWidget {
         .length;
 
     final cancelledTrips = bookings
-        .where((booking) => booking.status == 'Cancelled by Driver')
-        .length;
+    .where(
+      (booking) =>
+          booking.status != 'Cancelled by Driver' &&
+booking.status != 'Cancelled by Customer',
+    )
+    .length;
 
     final activeTrips = bookings
         .where(
