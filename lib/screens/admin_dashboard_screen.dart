@@ -12,9 +12,29 @@ import 'welcome_screen.dart';
 ///
 /// This screen is used by the taxi business owner/admin.
 /// It shows all bookings, business statistics, revenue,
-/// pricing settings, driver management, and driver assignment.
-class AdminDashboardScreen extends StatelessWidget {
+/// pricing settings, driver management, driver assignment,
+/// and booking status filtering.
+class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
+
+  @override
+  State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
+}
+
+class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
+  /// The currently selected booking filter.
+  String selectedFilter = 'All';
+
+  /// Available filters shown above the booking list.
+  final List<String> filters = [
+    'All',
+    'Pending',
+    'Assigned',
+    'Accepted',
+    'Started',
+    'Completed',
+    'Cancelled',
+  ];
 
   /// Logs the admin out and returns to the welcome screen.
   void _logout(BuildContext context) {
@@ -44,15 +64,16 @@ class AdminDashboardScreen extends StatelessWidget {
     }
 
     if (status == 'Cancelled by Driver' || status == 'Cancelled by Customer') {
-  return const Color(0xFFDC2626);
-}
+      return const Color(0xFFDC2626);
+    }
 
     return const Color(0xFFF59E0B);
   }
 
   /// Clears all saved bookings after confirmation.
   ///
-  /// This is only for MVP/demo testing. It does not clear drivers or pricing.
+  /// This is only for MVP/demo testing.
+  /// It does not clear drivers or pricing.
   Future<void> _clearDemoData(BuildContext context) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -84,16 +105,13 @@ class AdminDashboardScreen extends StatelessWidget {
       await AppData.clearBookings();
 
       if (context.mounted) {
+        setState(() {
+          selectedFilter = 'All';
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('All demo bookings were cleared.'),
-          ),
-        );
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const AdminDashboardScreen(),
           ),
         );
       }
@@ -110,6 +128,15 @@ class AdminDashboardScreen extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please add drivers before assigning bookings.'),
+        ),
+      );
+      return;
+    }
+
+    if (!_canAssignDriver(booking)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This booking can no longer be assigned.'),
         ),
       );
       return;
@@ -167,8 +194,10 @@ class AdminDashboardScreen extends StatelessWidget {
       return;
     }
 
-    booking.assignedDriver = selectedDriverName;
-    booking.status = 'Assigned to Driver';
+    setState(() {
+      booking.assignedDriver = selectedDriverName;
+      booking.status = 'Assigned to Driver';
+    });
 
     await AppData.saveBookings();
 
@@ -178,19 +207,82 @@ class AdminDashboardScreen extends StatelessWidget {
           content: Text('Booking assigned to $selectedDriverName.'),
         ),
       );
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const AdminDashboardScreen(),
-        ),
-      );
     }
+  }
+
+  /// Returns bookings based on the selected admin filter.
+  ///
+  /// This method checks both the booking status and assigned driver,
+  /// because pending bookings are identified by having no assigned driver yet.
+  List<RideBooking> _filteredBookings(List<RideBooking> bookings) {
+    if (selectedFilter == 'All') {
+      return bookings;
+    }
+
+    if (selectedFilter == 'Pending') {
+      return bookings.where((booking) {
+        final hasNoDriver = booking.assignedDriver == 'Not assigned yet';
+
+        final isNotFinished = booking.status != 'Trip Completed' &&
+            booking.status != 'Trip Started' &&
+            booking.status != 'Accepted by Driver' &&
+            booking.status != 'Assigned to Driver' &&
+            booking.status != 'Cancelled by Driver' &&
+            booking.status != 'Cancelled by Customer';
+
+        return hasNoDriver && isNotFinished;
+      }).toList();
+    }
+
+    if (selectedFilter == 'Assigned') {
+      return bookings.where((booking) {
+        return booking.status == 'Assigned to Driver';
+      }).toList();
+    }
+
+    if (selectedFilter == 'Accepted') {
+      return bookings.where((booking) {
+        return booking.status == 'Accepted by Driver';
+      }).toList();
+    }
+
+    if (selectedFilter == 'Started') {
+      return bookings.where((booking) {
+        return booking.status == 'Trip Started';
+      }).toList();
+    }
+
+    if (selectedFilter == 'Completed') {
+      return bookings.where((booking) {
+        return booking.status == 'Trip Completed';
+      }).toList();
+    }
+
+    if (selectedFilter == 'Cancelled') {
+      return bookings.where((booking) {
+        return booking.status == 'Cancelled by Driver' ||
+            booking.status == 'Cancelled by Customer';
+      }).toList();
+    }
+
+    return bookings;
+  }
+
+  /// Checks if the admin can still assign a driver to this booking.
+  ///
+  /// Admin should not assign drivers to trips that already started,
+  /// completed, or were cancelled.
+  bool _canAssignDriver(RideBooking booking) {
+    return booking.status != 'Trip Completed' &&
+        booking.status != 'Trip Started' &&
+        booking.status != 'Cancelled by Driver' &&
+        booking.status != 'Cancelled by Customer';
   }
 
   @override
   Widget build(BuildContext context) {
     final bookings = AppData.bookings;
+    final visibleBookings = _filteredBookings(bookings);
 
     final totalBookings = bookings.length;
 
@@ -199,23 +291,28 @@ class AdminDashboardScreen extends StatelessWidget {
         .length;
 
     final cancelledTrips = bookings
-    .where(
-      (booking) =>
-          booking.status != 'Cancelled by Driver' &&
-booking.status != 'Cancelled by Customer',
-    )
-    .length;
+        .where(
+          (booking) =>
+              booking.status == 'Cancelled by Driver' ||
+              booking.status == 'Cancelled by Customer',
+        )
+        .length;
 
     final activeTrips = bookings
         .where(
           (booking) =>
               booking.status != 'Trip Completed' &&
-              booking.status != 'Cancelled by Driver',
+              booking.status != 'Cancelled by Driver' &&
+              booking.status != 'Cancelled by Customer',
         )
         .length;
 
     final estimatedRevenue = bookings
-        .where((booking) => booking.status != 'Cancelled by Driver')
+        .where(
+          (booking) =>
+              booking.status != 'Cancelled by Driver' &&
+              booking.status != 'Cancelled by Customer',
+        )
         .fold<double>(
           0,
           (total, booking) => total + booking.estimatedFare,
@@ -230,6 +327,7 @@ booking.status != 'Cancelled by Customer',
             children: [
               const SizedBox(height: 10),
 
+              // Header with admin name and logout button.
               Row(
                 children: [
                   Expanded(
@@ -262,6 +360,7 @@ booking.status != 'Cancelled by Customer',
 
               const SizedBox(height: 24),
 
+              // Main admin summary card.
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
@@ -333,6 +432,7 @@ booking.status != 'Cancelled by Customer',
 
               const SizedBox(height: 24),
 
+              // Dashboard statistics row one.
               Row(
                 children: [
                   Expanded(
@@ -355,6 +455,7 @@ booking.status != 'Cancelled by Customer',
 
               const SizedBox(height: 14),
 
+              // Dashboard statistics row two.
               Row(
                 children: [
                   Expanded(
@@ -377,6 +478,7 @@ booking.status != 'Cancelled by Customer',
 
               const SizedBox(height: 24),
 
+              // Opens driver management screen.
               SizedBox(
                 width: double.infinity,
                 height: 54,
@@ -408,6 +510,7 @@ booking.status != 'Cancelled by Customer',
 
               const SizedBox(height: 12),
 
+              // Opens pricing settings screen.
               SizedBox(
                 width: double.infinity,
                 height: 54,
@@ -439,6 +542,7 @@ booking.status != 'Cancelled by Customer',
 
               const SizedBox(height: 12),
 
+              // Clears all saved demo booking data.
               SizedBox(
                 width: double.infinity,
                 height: 54,
@@ -463,16 +567,72 @@ booking.status != 'Cancelled by Customer',
 
               const SizedBox(height: 24),
 
-              const Text(
-                'All Bookings',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF111827),
-                ),
+              // Booking list heading.
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'All Bookings',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF111827),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '${visibleBookings.length} shown',
+                    style: const TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
 
               const SizedBox(height: 12),
+
+              // Horizontal booking status filter chips.
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: filters.map((filter) {
+                    final isSelected = selectedFilter == filter;
+
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: ChoiceChip(
+                        label: Text(filter),
+                        selected: isSelected,
+                        onSelected: (_) {
+                          setState(() {
+                            selectedFilter = filter;
+                          });
+                        },
+                        selectedColor: const Color(0xFF1E3A8A),
+                        backgroundColor: Colors.white,
+                        labelStyle: TextStyle(
+                          color: isSelected
+                              ? Colors.white
+                              : const Color(0xFF374151),
+                          fontWeight: FontWeight.bold,
+                        ),
+                        side: BorderSide(
+                          color: isSelected
+                              ? const Color(0xFF1E3A8A)
+                              : const Color(0xFFE5E7EB),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+
+              const SizedBox(height: 18),
 
               if (bookings.isEmpty)
                 Container(
@@ -493,13 +653,33 @@ booking.status != 'Cancelled by Customer',
                     ),
                   ),
                 )
+              else if (visibleBookings.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                  ),
+                  child: Text(
+                    'No bookings found for the "$selectedFilter" filter.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontSize: 15,
+                      height: 1.4,
+                    ),
+                  ),
+                )
               else
                 ListView.builder(
-                  itemCount: bookings.length,
+                  itemCount: visibleBookings.length,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemBuilder: (context, index) {
-                    final booking = bookings[index];
+                    final booking = visibleBookings[index];
+                    final canAssignDriver = _canAssignDriver(booking);
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 16),
@@ -512,6 +692,7 @@ booking.status != 'Cancelled by Customer',
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Booking route title.
                           Row(
                             children: [
                               const Icon(
@@ -534,6 +715,7 @@ booking.status != 'Cancelled by Customer',
 
                           const SizedBox(height: 12),
 
+                          // Booking status badge.
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
@@ -556,6 +738,7 @@ booking.status != 'Cancelled by Customer',
 
                           const SizedBox(height: 16),
 
+                          // Booking details.
                           SummaryRow(
                             title: 'Customer',
                             value: booking.customerName,
@@ -585,31 +768,55 @@ booking.status != 'Cancelled by Customer',
 
                           const SizedBox(height: 14),
 
-                          SizedBox(
-                            width: double.infinity,
-                            height: 48,
-                            child: OutlinedButton.icon(
-                              onPressed: () {
-                                _assignDriverToBooking(context, booking);
-                              },
-                              icon: const Icon(Icons.assignment_ind_rounded),
-                              label: const Text(
-                                'Assign Driver',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
+                          if (canAssignDriver)
+                            SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  _assignDriverToBooking(context, booking);
+                                },
+                                icon: const Icon(
+                                  Icons.assignment_ind_rounded,
+                                ),
+                                label: const Text(
+                                  'Assign Driver',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF1E3A8A),
+                                  side: const BorderSide(
+                                    color: Color(0xFF1E3A8A),
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
                                 ),
                               ),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFF1E3A8A),
-                                side: const BorderSide(
-                                  color: Color(0xFF1E3A8A),
+                            )
+                          else
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF9FAFB),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: const Color(0xFFE5E7EB),
                                 ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Text(
+                                'This booking can no longer be assigned.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Color(0xFF6B7280),
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
-                          ),
                         ],
                       ),
                     );
